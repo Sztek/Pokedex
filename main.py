@@ -35,12 +35,17 @@ class Postac:
         self.timer = 0
         self.body = Rect(self.x * 64, self.y * 64, 64, 64)
         self.texture = image.load('ele.png')
+        self.alife = True
 
     def __del__(self):
         print('pika')
+        self.x = -1
+        self.y = -1
+        self.alife = False
+        self.tick()
 
     def wild(self):
-        self.texture = image.load('bat.png')
+        self.texture = image.load('chi.png')
         self.x = 2
         self.y = 2
 
@@ -58,27 +63,31 @@ class Postac:
             self.dy = 0
 
     def poketick(self, px, py):
-        self.tick()
-        if self.x == px and self.y == py:
-            self.__del__()
-            return False
+        if self.alife:
+            self.tick()
+            if self.x == px and self.y == py:
+                self.__del__()
+                return False
         return True
 
     def idle(self, kolizje):
         kierunek = random.randrange(4)
-        self.move(kierunek, kolizje[kierunek])
+        self.move(kierunek, kolizje[kierunek], False)
 
-    def move(self, kierunek, kolizja):
-        if not self.timer and not self.dx and not self.dy and not kolizja:
+    def move(self, kierunek, kolizja, onedge):
+        scale = 1
+        if onedge:
+            scale = -8
+        if not self.timer and not self.dx and not self.dy and (not kolizja or onedge):
             self.timer = 20
             if kierunek == 0:
-                self.dy = -0.05
+                self.dy = -0.05 * scale
             elif kierunek == 1:
-                self.dy = 0.05
+                self.dy = 0.05 * scale
             elif kierunek == 2:
-                self.dx = -0.05
+                self.dx = -0.05 * scale
             elif kierunek == 3:
-                self.dx = 0.05
+                self.dx = 0.05 * scale
 
 
 mydb = mysql.connector.connect(host="localhost", user="root", password="Mamatata1", port='3306', database='pokedex')
@@ -90,32 +99,36 @@ for x in myresult:
 
 pygame.init()
 onmap = True
-black = 0, 0, 0
 hero = Postac()
 pokemon = Postac()
 pokemon.wild()
 plansza = []
 hud = image.load('hud.png')
-fightbg = image.load('fightbg.png')
 
-for i in range(9):
+
+for i in range(10):
     plansza.append([])
-    for j in range(9):
+    for j in range(10):
         plansza[i].append(Pole())
         plansza[i][j].set(i, j, random.randrange(7))
-        if i == 0 or j == 0 or i == 8 or j == 8:
+        if i == 9 or j == 9:
             plansza[i][j].kolizja = True
-
+mapbg = Surface((576, 576))
+for i in range(9):
+    for j in range(9):
+        mapbg.blit(plansza[i][j].texture, plansza[i][j].body)
 TICK = pygame.USEREVENT + 1
 time.set_timer(TICK, 1000)
 
 screen = display.set_mode((768, 576))
+screen.blit(hud, (576, 0, 192, 768))
 mapscreen = Surface((576, 576))
-fightscreen = Surface((576, 576))
-fightscreen = fightscreen.convert_alpha()
+
+fightscreen = Surface((576, 576)).convert_alpha()
 liczi = 0
-liczj = 0
 initialfight = True
+fightbg = transform.scale(image.load('fightbg.png'), (576, 576))
+fightpokemon = transform.scale(image.load('chi.png').convert_alpha(), (512, 512))
 
 while 1:
     pygame.time.Clock().tick(60)
@@ -131,24 +144,21 @@ while 1:
                     plansza[pokemon.x][pokemon.y+1].kolizja])
 
         if pygame.key.get_pressed()[K_w]:
-            hero.move(0, plansza[int(hero.x)][int(hero.y) - 1].kolizja)
+            hero.move(0, plansza[int(hero.x)][int(hero.y) - 1].kolizja, hero.y == 0)
         elif pygame.key.get_pressed()[K_s]:
-            hero.move(1, plansza[int(hero.x)][int(hero.y) + 1].kolizja)
+            hero.move(1, plansza[int(hero.x)][int(hero.y) + 1].kolizja, hero.y == 8)
         elif pygame.key.get_pressed()[K_a]:
-            hero.move(2, plansza[int(hero.x) - 1][int(hero.y)].kolizja)
+            hero.move(2, plansza[int(hero.x) - 1][int(hero.y)].kolizja, hero.x == 0)
         elif pygame.key.get_pressed()[K_d]:
-            hero.move(3, plansza[int(hero.x) + 1][int(hero.y)].kolizja)
+            hero.move(3, plansza[int(hero.x) + 1][int(hero.y)].kolizja, hero.x == 8)
 
         hero.tick()
         onmap = pokemon.poketick(hero.x, hero.y)
-        mapscreen.fill(black)
-        for i in range(9):
-            for j in range(9):
-                # draw.rect(screen, Color(50+j*20, 150, 50+i*20), plansza[i][j].body)
-                mapscreen.blit(plansza[i][j].texture, plansza[i][j].body)
+        mapscreen.blit(mapbg, (0, 0, 576, 576))
         mapscreen.blit(hero.texture, hero.body)
         mapscreen.blit(pokemon.texture, pokemon.body)
         screen.blit(mapscreen, (0, 0, 576, 576))
+
     else:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -159,15 +169,14 @@ while 1:
             pygame.time.Clock().tick(30)
             fightscreen.fill((0, 0, 0, 0))
             for i in range(liczi):
-                for j in range(liczj):
+                for j in range(liczi):
                     draw.rect(fightscreen, (0, 0, 0), plansza[i][j].body)
             if liczi < 9:
                 liczi += 1
-                liczj += 1
             else:
                 initialfight = False
         else:
             fightscreen.blit(fightbg, (0, 0, 576, 576))
+            fightscreen.blit(fightpokemon, (32, 32, 512, 512))
         screen.blit(fightscreen, (0, 0, 576, 576))
-    screen.blit(hud, (576, 0, 192, 768))
     display.flip()
