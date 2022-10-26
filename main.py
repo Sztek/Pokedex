@@ -26,6 +26,82 @@ class Pole:
         self.texture.scroll(64, 64)
 
 
+class Mapa:
+    def __init__(self):
+        self.plansza = []
+        self.walls = []
+        self.map = Surface((576, 576))
+        self.dx = 0
+        self.dy = 0
+        self.x = 0
+        self.y = 0
+        self.timer = 0
+        self.shadow = None
+        self.isshadow = True
+
+    def set(self):
+        for i in range(10):
+            self.plansza.append([])
+            self.walls.append([])
+            for j in range(10):
+                self.plansza[i].append(Pole())
+                self.walls[i].append(False)
+                self.plansza[i][j].set(i, j, random.randrange(7))
+                if i == 9 or j == 9:
+                    self.walls[i][j] = True
+        for i in range(9):
+            for j in range(9):
+                self.map.blit(self.plansza[i][j].texture, self.plansza[i][j].body)
+        return self.walls
+
+    def move(self, go, kierunek, isshadow):
+        if go:
+            self.isshadow = isshadow
+            if not isshadow:
+                self.shadow = Mapa()
+                self.walls = self.shadow.set()
+                self.shadow.move(go, kierunek, 1)
+                if kierunek == 0:
+                    self.shadow.x = 0
+                    self.shadow.y = -576
+                elif kierunek == 1:
+                    self.shadow.x = 0
+                    self.shadow.y = 576
+                elif kierunek == 2:
+                    self.shadow.x = -576
+                    self.shadow.y = 0
+                elif kierunek == 3:
+                    self.shadow.x = 576
+                    self.shadow.y = 0
+            self.timer = 20
+            if kierunek == 0:
+                self.dy = 28.8
+            elif kierunek == 1:
+                self.dy = -28.8
+            elif kierunek == 2:
+                self.dx = 28.8
+            elif kierunek == 3:
+                self.dx = -28.8
+
+    def tick(self):
+        if not self.isshadow:
+            self.shadow.tick()
+        if self.timer:
+            self.timer -= 1
+            self.x += self.dx
+            self.y += self.dy
+            if not self.timer:
+                self.x = round(self.x)
+                self.y = round(self.y)
+        else:
+            self.dx = 0
+            self.dy = 0
+            self.x = 0
+            self.y = 0
+            if not self.isshadow:
+                self.map = self.shadow.map
+
+
 class Postac:
     def __init__(self):
         self.x = 4
@@ -48,6 +124,7 @@ class Postac:
         self.texture = image.load('chi.png')
         self.x = 2
         self.y = 2
+        self.alife = True
 
     def tick(self):
         self.body = Rect(self.x * 64, self.y * 64, 64, 64)
@@ -88,6 +165,7 @@ class Postac:
                 self.dx = -0.05 * scale
             elif kierunek == 3:
                 self.dx = 0.05 * scale
+        return onedge
 
 
 mydb = mysql.connector.connect(host="localhost", user="root", password="Mamatata1", port='3306', database='pokedex')
@@ -98,25 +176,30 @@ for x in myresult:
     print(x)
 
 pygame.init()
+pygame.display.set_caption('Polslmon')
+pygame.display.set_icon(image.load('icon.png'))
 onmap = True
 hero = Postac()
 pokemon = Postac()
 pokemon.wild()
-plansza = []
+klocki = []
 hud = image.load('hud.png')
 
-
 for i in range(10):
-    plansza.append([])
+    klocki.append([])
     for j in range(10):
-        plansza[i].append(Pole())
-        plansza[i][j].set(i, j, random.randrange(7))
+        klocki[i].append(Pole())
+        klocki[i][j].set(i, j, random.randrange(7))
         if i == 9 or j == 9:
-            plansza[i][j].kolizja = True
+            klocki[i][j].kolizja = True
 mapbg = Surface((576, 576))
 for i in range(9):
     for j in range(9):
-        mapbg.blit(plansza[i][j].texture, plansza[i][j].body)
+        mapbg.blit(klocki[i][j].texture, klocki[i][j].body)
+
+plansza = Mapa()
+wall = plansza.set()
+
 TICK = pygame.USEREVENT + 1
 time.set_timer(TICK, 1000)
 
@@ -130,6 +213,8 @@ initialfight = True
 fightbg = transform.scale(image.load('fightbg.png'), (576, 576))
 fightpokemon = transform.scale(image.load('chi.png').convert_alpha(), (512, 512))
 
+timer = 0
+
 while 1:
     pygame.time.Clock().tick(60)
     if onmap:
@@ -138,25 +223,36 @@ while 1:
                 sys.exit()
             if event.type == TICK:
                 pokemon.idle([
-                    plansza[pokemon.x][pokemon.y-1].kolizja,
-                    plansza[pokemon.x][pokemon.y+1].kolizja,
-                    plansza[pokemon.x-1][pokemon.y].kolizja,
-                    plansza[pokemon.x][pokemon.y+1].kolizja])
+                    wall[pokemon.x][pokemon.y-1],
+                    wall[pokemon.x][pokemon.y+1],
+                    wall[pokemon.x-1][pokemon.y],
+                    wall[pokemon.x][pokemon.y+1]])
 
-        if pygame.key.get_pressed()[K_w]:
-            hero.move(0, plansza[int(hero.x)][int(hero.y) - 1].kolizja, hero.y == 0)
-        elif pygame.key.get_pressed()[K_s]:
-            hero.move(1, plansza[int(hero.x)][int(hero.y) + 1].kolizja, hero.y == 8)
-        elif pygame.key.get_pressed()[K_a]:
-            hero.move(2, plansza[int(hero.x) - 1][int(hero.y)].kolizja, hero.x == 0)
-        elif pygame.key.get_pressed()[K_d]:
-            hero.move(3, plansza[int(hero.x) + 1][int(hero.y)].kolizja, hero.x == 8)
+        if timer == 0:
+            timer = 20
+            if pygame.key.get_pressed()[K_w]:
+                plansza.move(hero.move(0, wall[int(hero.x)][int(hero.y) - 1], hero.y == 0), 0, 0)
+            elif pygame.key.get_pressed()[K_s]:
+                plansza.move(hero.move(1, wall[int(hero.x)][int(hero.y) + 1], hero.y == 8), 1, 0)
+            elif pygame.key.get_pressed()[K_a]:
+                plansza.move(hero.move(2, wall[int(hero.x) - 1][int(hero.y)], hero.x == 0), 2, 0)
+            elif pygame.key.get_pressed()[K_d]:
+                plansza.move(hero.move(3, wall[int(hero.x) + 1][int(hero.y)], hero.x == 8), 3, 0)
+            else:
+                timer = 0
+        else:
+            timer -= 1
 
         hero.tick()
+        plansza.tick()
         onmap = pokemon.poketick(hero.x, hero.y)
-        mapscreen.blit(mapbg, (0, 0, 576, 576))
+        mapscreen.blit(plansza.map, (plansza.x, plansza.y, 576, 576))
+        if plansza.timer > 0:
+            mapscreen.blit(plansza.shadow.map, (plansza.shadow.x, plansza.shadow.y, 576, 576))
+            pokemon.wild()
+        else:
+            mapscreen.blit(pokemon.texture, pokemon.body)
         mapscreen.blit(hero.texture, hero.body)
-        mapscreen.blit(pokemon.texture, pokemon.body)
         screen.blit(mapscreen, (0, 0, 576, 576))
 
     else:
@@ -170,7 +266,7 @@ while 1:
             fightscreen.fill((0, 0, 0, 0))
             for i in range(liczi):
                 for j in range(liczi):
-                    draw.rect(fightscreen, (0, 0, 0), plansza[i][j].body)
+                    draw.rect(fightscreen, (0, 0, 0), klocki[i][j].body)
             if liczi < 9:
                 liczi += 1
             else:
