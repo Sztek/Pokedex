@@ -10,25 +10,26 @@ class Pole:
     def __init__(self):
         self.kolizja = False
         self.body = Rect(0, 0, 64, 64)
-        self.texture = 0
+        self.texture = Surface((64, 64))
+        self.img = image.load('tileset.png')
+        self.img = transform.scale2x(self.img)
+        self.img.scroll(64, 64)
 
     def set(self, px, py, tile):
-        sizex = (64, 64)
-        self.texture = Surface(sizex)
-        img = image.load('Tile-SpringGround.png')
-        img = transform.scale(img, (160 * 4, 112 * 4))
-        img.scroll(64, 64)
         if tile == 0:
-            self.texture.blit(img, (0, 0), (512, 128, 64, 64))
-        else:
-            self.texture.blit(img, (0, 0), (128, 128, 64, 64))
+            self.texture.blit(self.img, (0, 0), (2 * 64, 2 * 64, 64, 64))
+        elif tile == 1:
+            self.texture.blit(self.img, (0, 0), (2 * 64, 2 * 64, 64, 64))
+        elif tile == 2:
+            self.texture.blit(self.img, (0, 0), (20 * 64, 4 * 64, 64, 64))
         self.body = Rect(px * 64, py * 64, 64, 64)
         self.texture.scroll(64, 64)
+        return self.kolizja
 
 
 class Mapa:
     def __init__(self):
-        self.plansza = []
+        self.plansza = Pole()
         self.walls = []
         self.map = Surface((576, 576))
         self.dx = 0
@@ -38,27 +39,38 @@ class Mapa:
         self.timer = 0
         self.shadow = None
         self.isshadow = True
+        self.korx = 9
+        self.kory = 4
 
     def set(self):
         for i in range(10):
-            self.plansza.append([])
+            for j in range(10):
+                self.plansza.set(i, j, 0)
+                self.map.blit(self.plansza.texture, self.plansza.body)
+        for i in range(10):
             self.walls.append([])
             for j in range(10):
-                self.plansza[i].append(Pole())
-                self.walls[i].append(False)
-                self.plansza[i][j].set(i, j, random.randrange(7))
+                self.walls[i].append(self.plansza.set(i, j, region[self.korx][self.kory][i][j]))
+                self.map.blit(self.plansza.texture, self.plansza.body)
                 if i == 9 or j == 9:
                     self.walls[i][j] = True
-        for i in range(9):
-            for j in range(9):
-                self.map.blit(self.plansza[i][j].texture, self.plansza[i][j].body)
         return self.walls
 
     def move(self, go, kierunek, isshadow):
         if go:
             self.isshadow = isshadow
             if not isshadow:
+                if kierunek == 0:
+                    self.kory -= 1
+                elif kierunek == 1:
+                    self.kory += 1
+                elif kierunek == 2:
+                    self.korx -= 1
+                elif kierunek == 3:
+                    self.korx += 1
                 self.shadow = Mapa()
+                self.shadow.kory = self.kory
+                self.shadow.korx = self.korx
                 self.walls = self.shadow.set()
                 self.shadow.move(go, kierunek, 1)
                 if kierunek == 0:
@@ -121,7 +133,9 @@ class Postac:
         self.tick()
 
     def wild(self):
-        self.texture = image.load('chi.png')
+        self.texture = Surface((64, 64))
+        self.texture.blit(image.load('pokemon.png'), (0, 0), (2 * 64, 0, 64, 64))
+        #self.texture = image.load('chi.png')
         self.x = 2
         self.y = 2
         self.alife = True
@@ -185,17 +199,31 @@ pokemon.wild()
 klocki = []
 hud = image.load('hud.png')
 
+
+region = []
+regionbg = []
+for i in range(17):
+    region.append([])
+    regionbg.append([])
+    for j in range(11):
+        region[i].append([])
+        regionbg[i].append(0)
+        for k in range(10):
+            region[i][j].append([])
+            for l in range(10):
+                region[i][j][k].append(1)
+                if i == k or j == l:
+                    region[i][j][k][l] = 0
+                if i == 9 and j == 5:
+                    region[i][j][k][l] = 2
+
+
+mapbg = Surface((576, 576))
 for i in range(10):
     klocki.append([])
     for j in range(10):
         klocki[i].append(Pole())
-        klocki[i][j].set(i, j, random.randrange(7))
-        if i == 9 or j == 9:
-            klocki[i][j].kolizja = True
-mapbg = Surface((576, 576))
-for i in range(9):
-    for j in range(9):
-        mapbg.blit(klocki[i][j].texture, klocki[i][j].body)
+        klocki[i][j].set(i, j, 0)
 
 plansza = Mapa()
 wall = plansza.set()
@@ -259,8 +287,6 @@ while 1:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 sys.exit()
-        if pygame.key.get_pressed()[K_SPACE]:
-            onmap = True
         if initialfight:
             pygame.time.Clock().tick(30)
             fightscreen.fill((0, 0, 0, 0))
@@ -272,6 +298,10 @@ while 1:
             else:
                 initialfight = False
         else:
+            if pygame.key.get_pressed()[K_SPACE]:
+                onmap = True
+                initialfight = True
+                liczi = 0
             fightscreen.blit(fightbg, (0, 0, 576, 576))
             fightscreen.blit(fightpokemon, (32, 32, 512, 512))
         screen.blit(fightscreen, (0, 0, 576, 576))
