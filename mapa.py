@@ -14,21 +14,25 @@ class Mapa:
         self.timer = 0
         self.shadow = None
         self.isshadow = True
-        self.korx = 9
-        self.kory = 4
+        self.korx = 6
+        self.kory = 3
         self.region = []
+        self.regionbg = []
 
-    def set(self, region):
+    def set(self, region, regionbg):
         self.region = region
+        self.regionbg = regionbg
+        self.walls = []
         for i in range(10):
             for j in range(10):
-                self.plansza.set(i, j, 0)
+                self.plansza.set(i, j, self.regionbg[self.korx][self.kory])
                 self.map.blit(self.plansza.texture, self.plansza.body)
         for i in range(10):
             self.walls.append([])
             for j in range(10):
                 self.walls[i].append(self.plansza.set(i, j, self.region[self.korx][self.kory][i][j]))
-                self.map.blit(self.plansza.texture, self.plansza.body)
+                if not self.region[self.korx][self.kory][i][j] == 0:
+                    self.map.blit(self.plansza.texture, self.plansza.body)
                 if i == 9 or j == 9:
                     self.walls[i][j] = True
         return self.walls
@@ -48,7 +52,7 @@ class Mapa:
                 self.shadow = Mapa()
                 self.shadow.kory = self.kory
                 self.shadow.korx = self.korx
-                self.walls = self.shadow.set(self.region)
+                self.walls = self.shadow.set(self.region, self.regionbg)
                 self.shadow.move(go, kierunek, 1)
                 if kierunek == 0:
                     self.shadow.x = 0
