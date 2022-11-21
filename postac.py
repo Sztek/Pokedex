@@ -1,4 +1,5 @@
 import random
+import mysql.connector
 from pygame import *
 
 
@@ -14,16 +15,26 @@ class Postac:
         self.alife = True
         self.img = image.load('pokeset.png')
 
-    def __del__(self):
+    def catch(self, trener, pokeid):
         self.x = -1
         self.y = -1
         self.alife = False
         self.tick()
+        mydb = mysql.connector.connect(host="localhost",user="root",password="Mamatata1",port='3306',database='pokedex')
+        mycursor = mydb.cursor()
+        mycursor.execute("SELECT * FROM pokedex_poki WHERE id="+str(pokeid))
+        myresult = mycursor.fetchall()
+        print(myresult[0])
+        mycursor = mydb.cursor()
+        sql = "INSERT INTO pokemony (nazwa, iv, wlasciciel, zdrowie, poziom) VALUES (%s, %s, %s, %s, %s)"
+        val = (myresult[0][1], random.randrange(5)+1, trener, 100, 1)
+        mycursor.execute(sql, val)
+        mydb.commit()
 
-    def wild(self, id):
+    def wild(self, pokeid):
         self.texture = Surface((64, 64)).convert_alpha()
         self.texture.fill((0, 0, 0, 0))
-        self.texture.blit(self.img, (0, 0), ((id) * 64, 0, 64, 64))
+        self.texture.blit(self.img, (0, 0), (pokeid * 64, 0, 64, 64))
         self.x = 3
         self.y = 2
         self.alife = True
@@ -41,11 +52,11 @@ class Postac:
             self.dx = 0
             self.dy = 0
 
-    def poketick(self, px, py):
+    def poketick(self, px, py, trener, pokeid):
         if self.alife:
             self.tick()
             if self.x == px and self.y == py:
-                self.__del__()
+                self.catch(trener, pokeid)
                 return False
         return True
 
